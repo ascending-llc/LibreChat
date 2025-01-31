@@ -1,0 +1,22 @@
+# Q Business API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: q-business-api
+  # namespace: librechat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: q-business-api
+  template:
+    metadata:
+      labels:
+        app: q-business-api
+    spec:
+      serviceAccountName: q-business-service-account
+      containers:
+        - name: q-business-api
+          image: 595312265488.dkr.ecr.us-east-1.amazonaws.com/askcto_dev:latest
+          ports:
+            - containerPort: 8080

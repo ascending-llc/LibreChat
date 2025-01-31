@@ -1,0 +1,43 @@
+# RAG API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-api
+spec:
+  selector:
+    matchLabels:
+      app: rag-api
+  template:
+    metadata:
+      labels:
+        app: rag-api
+    spec:
+      containers:
+        - name: rag-api
+          image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:latest
+          env:
+            - name: DB_HOST
+              value: "askcto-db.c6tqxth4eafz.us-east-1.rds.amazonaws.com"
+            - name: RAG_PORT
+              value: "8000"
+            - name: OPENAI_API_KEY
+              value: ""
+            - name: POSTGRES_DB
+              value: "postgres"
+            - name: POSTGRES_USER
+              value: "dbadmin"
+            - name: POSTGRES_PASSWORD
+              value: "6w]WMfb16T<7J*ML#.Kv*:ouyg?g"
+---
+# RAG API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api
+spec:
+  selector:
+    app: rag-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+---

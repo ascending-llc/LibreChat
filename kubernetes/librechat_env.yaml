@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: librechat-env
+data:
+  HOST: "0.0.0.0"
+  PORT: "3080"
+  DOMAIN_CLIENT: "http://localhost:3080"
+  DOMAIN_SERVER: "http://localhost:3080"
+  NO_INDEX: "true"
+  CONSOLE_JSON: "false"
+  DEBUG_LOGGING: "true"
+  DEBUG_CONSOLE: "false"
+  SEARCH: "true"
+  MEILI_NO_ANALYTICS: "true"
+  MEILI_HOST: "http://meilisearch:7700"
+  DEBUG_PLUGINS: "true"
+  ALLOW_EMAIL_LOGIN: "true"
+  ALLOW_REGISTRATION: "true"
+  ALLOW_SOCIAL_LOGIN: "false"
+  ALLOW_SOCIAL_REGISTRATION: "false"
+  ALLOW_PASSWORD_RESET: "false"
+  ALLOW_UNVERIFIED_EMAIL_LOGIN: "true"
+  ALLOW_SHARED_LINKS: "true"
+  ALLOW_SHARED_LINKS_PUBLIC: "true"
+  APP_TITLE: "LibreChat"
+  Q_BUSINESS_API_BASE_URL: "http://q-business-api-service:8080/v1/chat/completions"
+  RAG_PORT: "8000"
+  RAG_API_URL: "http://rag-api:8000"

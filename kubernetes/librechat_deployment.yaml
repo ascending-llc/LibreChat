@@ -1,0 +1,71 @@
+# Main LibreChat Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: librechat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: librechat
+  template:
+    metadata:
+      labels:
+        app: librechat
+    spec:
+      # serviceAccountName: librechat
+      containers:
+        - name: librechat
+          image: "ghcr.io/danny-avila/librechat:latest"
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: MONGO_URI
+              value: "mongodb://mongodb:27017/LibreChat"
+            - name: MEILI_HOST
+              value: "http://meilisearch:7700"
+            - name: PORT
+              value: "3080"
+            - name: NO_INDEX
+              value: "true"
+            - name: CONSOLE_JSON
+              value: "false"
+            - name: DEBUG_LOGGING
+              value: "true"
+            - name: DEBUG_CONSOLE
+              value: "false"
+            - name: CREDS_KEY
+              value: "f34be427ebb29de8d88c107a71546019685ed8b241d8f2ed00c3df97ad2566f0"
+            - name: CREDS_IV
+              value: "e2341419ec3dd3d19b13a1a87fafcbfb"
+            - name: Q_BUSINESS_API_BASE_URL
+              value: "http://q-business-api-service:8080/v1/chat/completions"
+            - name: JWT_SECRET
+              value: "16f8c0ef4a5d391b26034086c628469d3f9f497f08163ab9b40137092f2909ef"
+            - name: JWT_REFRESH_SECRET
+              value: "eaa5191f2914e30b9387fd84e254e4ba6fc51b4654968a9b0803b456a54b8418"          
+          envFrom:
+            - configMapRef:
+                name: librechat-env
+          ports:
+            - name: http
+              containerPort: 3080
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 5
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            initialDelaySeconds: 5
+            httpGet:
+              path: /
+              port: http
+          volumeMounts:
+            - name: librechat-config
+              mountPath: /app/librechat.yaml
+              subPath: librechat.yaml
+      volumes:
+        - name: librechat-config
+          configMap:
+            name: librechat-config
