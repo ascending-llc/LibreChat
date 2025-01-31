@@ -72,7 +72,7 @@ endpoints:
   custom:
     - name: "AskCTO"
       apiKey: "sk-N2JvZTczN2EtMjE4Zi00ZjUyLTkxMDAtZDY4N2YxOTJhY2Q2ODc4YmFkNzE="
-      baseURL: "http://q_business_api:8080/v1/chat/completions"
+      baseURL: "http://q-business-api-service:8080/v1/chat/completions"
       models:
         default: ["cto"]
       titleConvo: true
