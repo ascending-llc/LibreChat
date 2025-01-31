@@ -255,7 +255,6 @@ class QBusinessClient:
                     userMessage=message,
                     chatMode='CREATOR_MODE'
                 )
-            logger.info(f"Resonse from Q Business: {response}")
             return response
         except Exception as e:
             logger.error(f"Error in chat_sync: {e}")
@@ -264,8 +263,6 @@ class QBusinessClient:
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     try:
-         # Log the full incoming request
-        logger.info(f"Received request: {request.dict()}")
 
         # Retrieve a valid access token from Secrets Manager
         idc_id_token = CognitoAuth.get_valid_idc_id_token()
@@ -278,20 +275,10 @@ async def chat_completions(request: ChatCompletionRequest):
         # Initialize Q Business client
         q_client = QBusinessClient(aws_credentials)
 
-        # # Extract the last user message
-        # user_messages = [msg.content for msg in request.messages if msg.role == "user"]
-        # if not user_messages:
-        #     raise HTTPException(status_code=400, detail="No user messages found in the request.")
-
-        # last_message = user_messages[-1]
-
          # Ensure all messages (user + assistant) are included
         conversation_messages = [
             {"role": msg.role, "content": msg.content} for msg in request.messages
         ]
-
-        # Log the conversation history before sending
-        logger.info(f"Sending conversation history to Q Business API: {json.dumps(conversation_messages, indent=2)}")
 
         # Ensure at least one user message is present
         if not any(msg["role"] == "user" for msg in conversation_messages):
@@ -301,7 +288,6 @@ async def chat_completions(request: ChatCompletionRequest):
         formatted_conversation = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in conversation_messages])
 
         # Call Q Business API
-        # response = await q_client.chat_sync(last_message)
         response = await q_client.chat_sync(formatted_conversation)
 
         # Extract response text
