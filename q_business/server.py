@@ -9,6 +9,8 @@ import os
 import logging
 import datetime
 from typing import List, Dict, Any
+import asyncio
+import re
 
 # Set AWS region globally
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
@@ -100,13 +102,17 @@ class CognitoAuth:
             return idc_id_token
 
         if cognito_refresh_token:
-            if idc_id_token:
-                logger.info("IDC ID token expired. Attempting refresh using Cognito refresh token.")
-                new_idc_id_token = CognitoAuth._refresh_idc_id_token(cognito_refresh_token)
-            else:
-                logger.info("No valid IDC ID token found. Refreshing Cognito ID token first.")
-                new_cognito_id_token = CognitoAuth._refresh_cognito_id_token(cognito_refresh_token)
-                new_idc_id_token = CognitoAuth._exchange_token_with_identity_center(new_cognito_id_token)
+            # if idc_id_token:
+            #     logger.info("IDC ID token expired. Attempting refresh using Cognito refresh token.")
+            #     new_idc_id_token = CognitoAuth._refresh_idc_id_token(cognito_refresh_token)
+            # else:
+            #     logger.info("No valid IDC ID token found. Refreshing Cognito ID token first.")
+            #     new_cognito_id_token = CognitoAuth._refresh_cognito_id_token(cognito_refresh_token)
+            #     new_idc_id_token = CognitoAuth._exchange_token_with_identity_center(new_cognito_id_token)
+
+            logger.info("No valid IDC ID token found. Refreshing Cognito ID token first.")
+            new_cognito_id_token = CognitoAuth._refresh_cognito_id_token(cognito_refresh_token)
+            new_idc_id_token = CognitoAuth._exchange_token_with_identity_center(new_cognito_id_token)
 
             CognitoAuth._store_idc_tokens(new_idc_id_token, cognito_refresh_token)
             return new_idc_id_token
@@ -257,6 +263,7 @@ class QBusinessClient:
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     try:
+
         # Retrieve a valid access token from Secrets Manager
         idc_id_token = CognitoAuth.get_valid_idc_id_token()
         if not idc_id_token:
@@ -268,22 +275,57 @@ async def chat_completions(request: ChatCompletionRequest):
         # Initialize Q Business client
         q_client = QBusinessClient(aws_credentials)
 
-        # Extract the last user message
-        user_messages = [msg.content for msg in request.messages if msg.role == "user"]
-        if not user_messages:
+         # Ensure all messages (user + assistant) are included
+        conversation_messages = [
+            {"role": msg.role, "content": msg.content} for msg in request.messages
+        ]
+
+        # Ensure at least one user message is present
+        if not any(msg["role"] == "user" for msg in conversation_messages):
             raise HTTPException(status_code=400, detail="No user messages found in the request.")
 
-        last_message = user_messages[-1]
+        # Convert conversation history into a readable string format for the API
+        formatted_conversation = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in conversation_messages])
 
         # Call Q Business API
-        response = await q_client.chat_sync(last_message)
+        response = await q_client.chat_sync(formatted_conversation)
 
         # Extract response text
         response_text = response.get("systemMessage", "No response received")
-        tokens = response_text.split()  # Simple tokenization
 
-        async def stream_generator():
-            for i, token in enumerate(tokens):
+        def split_text_preserving_code_blocks(text):
+            """
+            Splits text by paragraphs but preserves code blocks.
+            """
+            code_block_pattern = re.compile(r"```.*?```", re.DOTALL)
+            segments = []
+            last_pos = 0
+
+            # Find and extract code blocks
+            for match in code_block_pattern.finditer(text):
+                start, end = match.span()
+                # Extract text before code block and split by \n\n
+                if last_pos < start:
+                    before_code = text[last_pos:start].strip()
+                    if before_code:
+                        segments.extend(before_code.split("\n\n"))  # Split paragraphs
+                # Add the code block as a single segment
+                segments.append(match.group(0).strip())
+                last_pos = end
+
+            # Process remaining text after last code block
+            if last_pos < len(text):
+                after_code = text[last_pos:].strip()
+                if after_code:
+                    segments.extend(after_code.split("\n\n"))
+
+            return [seg for seg in segments if seg.strip()]  # Remove empty segments
+
+        async def stream_generator(response_text):
+            """Streams text properly formatted with preserved code blocks."""
+            segments = split_text_preserving_code_blocks(response_text)
+
+            for i, segment in enumerate(segments):
                 chunk = {
                     "id": f"chatcmpl-{i}",
                     "object": "chat.completion.chunk",
@@ -292,17 +334,19 @@ async def chat_completions(request: ChatCompletionRequest):
                     "choices": [{
                         "delta": {
                             "role": "assistant",
-                            "content": token + " "
+                            "content": segment + "\n\n"  # Preserve formatting
                         },
                         "index": 0,
-                        "finish_reason": "stop" if i == len(tokens) - 1 else None
+                        "finish_reason": "stop" if i == len(segments) - 1 else None
                     }]
                 }
                 yield f"data: {json.dumps(chunk)}\n\n"
+                await asyncio.sleep(0.1)  # Simulate streaming delay
+
             yield "data: [DONE]\n\n"
 
         return StreamingResponse(
-            stream_generator(),
+            stream_generator(response_text),
             media_type="text/event-stream"
         )
 
