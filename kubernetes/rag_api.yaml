@@ -27,7 +27,7 @@ spec:
             - name: POSTGRES_USER
               value: "dbadmin"
             - name: POSTGRES_PASSWORD
-              value: "6w]WMfb16T<7J*ML#.Kv*:ouyg?g"
+              value: ""
 ---
 # RAG API Service
 apiVersion: v1
