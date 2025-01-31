@@ -5,13 +5,15 @@
 version: 1.2.1
 
 # Cache settings: Set to true to enable caching
+
 # cache: true
+
 
 # Custom interface configuration
 interface:
   # Privacy policy settings
   privacyPolicy:
-    externalUrl: 'https://librechat.ai/privacy-policy'
+    externalUrl: 'https://app.termly.io/policy-viewer/policy.html?policyUUID=0c91586e-1d8d-489e-83af-70b343467a34'
     openNewTab: true
 
   # Terms of service
@@ -67,8 +69,95 @@ interface:
   multiConvo: true
   agents: true
 
+
+# Example Registration Object Structure (optional)
+registration:
+  socialLogins: ['github', 'google', 'discord', 'openid', 'facebook']
+  # allowedDomains:
+  # - "gmail.com"
+
+# speech:
+#   tts:
+#     openai:
+#       url: ''
+#       apiKey: '${TTS_API_KEY}'
+#       model: ''
+#       voices: ['']
+
+#  
+#   stt:
+#     openai:
+#       url: ''
+#       apiKey: '${STT_API_KEY}'
+#       model: ''
+
+# rateLimits:
+#   fileUploads:
+#     ipMax: 100
+#     ipWindowInMinutes: 60  # Rate limit window for file uploads per IP
+#     userMax: 50
+#     userWindowInMinutes: 60  # Rate limit window for file uploads per user
+#   conversationsImport:
+#     ipMax: 100
+#     ipWindowInMinutes: 60  # Rate limit window for conversation imports per IP
+#     userMax: 50
+#     userWindowInMinutes: 60  # Rate limit window for conversation imports per user
+
+# Example Actions Object Structure
+actions:
+  allowedDomains:
+    - "swapi.dev"
+    - "librechat.ai"
+    - "google.com"
+
+# Example MCP Servers Object Structure
+mcpServers:
+  everything:
+    # type: sse # type can optionally be omitted
+    url: http://localhost:3001/sse
+  puppeteer:
+    type: stdio
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-puppeteer"
+  filesystem:
+    # type: stdio
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-filesystem"
+      - /home/user/LibreChat/
+    iconPath: /home/user/LibreChat/client/public/assets/logo.svg
+  mcp-obsidian:
+    command: npx
+    args:
+      - -y
+      - "mcp-obsidian"
+      - /path/to/obsidian/vault
+
 # Definition of custom endpoints
 endpoints:
+  # assistants:
+  #   disableBuilder: false # Disable Assistants Builder Interface by setting to `true`
+  #   pollIntervalMs: 3000  # Polling interval for checking assistant updates
+  #   timeoutMs: 180000  # Timeout for assistant operations
+  #   # Should only be one or the other, either `supportedIds` or `excludedIds`
+  #   supportedIds: ["asst_supportedAssistantId1", "asst_supportedAssistantId2"]
+  #   # excludedIds: ["asst_excludedAssistantId"]
+  #   Only show assistants that the user created or that were created externally (e.g. in Assistants playground).
+  #   # privateAssistants: false # Does not work with `supportedIds` or `excludedIds`
+  #   # (optional) Models that support retrieval, will default to latest known OpenAI models that support the feature
+  #   retrievalModels: ["gpt-4-turbo-preview"]
+  #   # (optional) Assistant Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
+  #   capabilities: ["code_interpreter", "retrieval", "actions", "tools", "image_vision"]
+  # agents:
+  #   (optional) Maximum recursion depth for agents, defaults to 25
+  #   recursionLimit: 50
+  #   (optional) Disable the builder interface for agents
+  #   disableBuilder: false
+  #   (optional) Agent Capabilities available to all users. Omit the ones you wish to exclude. Defaults to list below.
+  #   capabilities: ["execute_code", "file_search", "actions", "tools"]
   custom:
     - name: "AskCTO"
       apiKey: "sk-N2JvZTczN2EtMjE4Zi00ZjUyLTkxMDAtZDY4N2YxOTJhY2Q2ODc4YmFkNzE="
@@ -81,3 +170,6 @@ endpoints:
       forcePrompt: false
       directEndpoint: true
       modelDisplayLabel: "CTO"
+
+
+   
