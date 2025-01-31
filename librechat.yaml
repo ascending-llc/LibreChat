@@ -5,57 +5,59 @@
 version: 1.2.1
 
 # Cache settings: Set to true to enable caching
+
 # cache: true
+
 
 # Custom interface configuration
 interface:
   # Privacy policy settings
   privacyPolicy:
-    externalUrl: 'https://librechat.ai/privacy-policy'
+    externalUrl: 'https://app.termly.io/policy-viewer/policy.html?policyUUID=0c91586e-1d8d-489e-83af-70b343467a34'
     openNewTab: true
 
   # Terms of service
   termsOfService:
-    externalUrl: 'https://librechat.ai/tos'
+    externalUrl: 'https://app.termly.io/policy-viewer/policy.html?policyUUID=c5f9adb5-4979-4c41-81de-904f87321a4e'
     openNewTab: true
-    modalAcceptance: true
-    modalTitle: "Terms of Service for LibreChat"
-    modalContent: |
-      # Terms and Conditions for LibreChat
+    modalAcceptance: false
+    # modalTitle: "Terms of Service for LibreChat"
+    # modalContent: |
+    #   # Terms and Conditions for LibreChat
 
-      *Effective Date: February 18, 2024*
+    #   *Effective Date: February 18, 2024*
 
-      Welcome to LibreChat, the informational website for the open-source AI chat platform, available at https://librechat.ai. These Terms of Service ("Terms") govern your use of our website and the services we offer. By accessing or using the Website, you agree to be bound by these Terms and our Privacy Policy, accessible at https://librechat.ai//privacy.
+    #   Welcome to LibreChat, the informational website for the open-source AI chat platform, available at https://librechat.ai. These Terms of Service ("Terms") govern your use of our website and the services we offer. By accessing or using the Website, you agree to be bound by these Terms and our Privacy Policy, accessible at https://librechat.ai//privacy.
 
-      ## 1. Ownership
+    #   ## 1. Ownership
 
-      Upon purchasing a package from LibreChat, you are granted the right to download and use the code for accessing an admin panel for LibreChat. While you own the downloaded code, you are expressly prohibited from reselling, redistributing, or otherwise transferring the code to third parties without explicit permission from LibreChat.
+    #   Upon purchasing a package from LibreChat, you are granted the right to download and use the code for accessing an admin panel for LibreChat. While you own the downloaded code, you are expressly prohibited from reselling, redistributing, or otherwise transferring the code to third parties without explicit permission from LibreChat.
 
-      ## 2. User Data
+    #   ## 2. User Data
 
-      We collect personal data, such as your name, email address, and payment information, as described in our Privacy Policy. This information is collected to provide and improve our services, process transactions, and communicate with you.
+    #   We collect personal data, such as your name, email address, and payment information, as described in our Privacy Policy. This information is collected to provide and improve our services, process transactions, and communicate with you.
 
-      ## 3. Non-Personal Data Collection
+    #   ## 3. Non-Personal Data Collection
 
-      The Website uses cookies to enhance user experience, analyze site usage, and facilitate certain functionalities. By using the Website, you consent to the use of cookies in accordance with our Privacy Policy.
+    #   The Website uses cookies to enhance user experience, analyze site usage, and facilitate certain functionalities. By using the Website, you consent to the use of cookies in accordance with our Privacy Policy.
 
-      ## 4. Use of the Website
+    #   ## 4. Use of the Website
 
-      You agree to use the Website only for lawful purposes and in a manner that does not infringe the rights of, restrict, or inhibit anyone else's use and enjoyment of the Website. Prohibited behavior includes harassing or causing distress or inconvenience to any person, transmitting obscene or offensive content, or disrupting the normal flow of dialogue within the Website.
+    #   You agree to use the Website only for lawful purposes and in a manner that does not infringe the rights of, restrict, or inhibit anyone else's use and enjoyment of the Website. Prohibited behavior includes harassing or causing distress or inconvenience to any person, transmitting obscene or offensive content, or disrupting the normal flow of dialogue within the Website.
 
-      ## 5. Governing Law
+    #   ## 5. Governing Law
 
-      These Terms shall be governed by and construed in accordance with the laws of the United States, without giving effect to any principles of conflicts of law.
+    #   These Terms shall be governed by and construed in accordance with the laws of the United States, without giving effect to any principles of conflicts of law.
 
-      ## 6. Changes to the Terms
+    #   ## 6. Changes to the Terms
 
-      We reserve the right to modify these Terms at any time. We will notify users of any changes by email. Your continued use of the Website after such changes have been notified will constitute your consent to such changes.
+    #   We reserve the right to modify these Terms at any time. We will notify users of any changes by email. Your continued use of the Website after such changes have been notified will constitute your consent to such changes.
 
-      ## 7. Contact Information
+    #   ## 7. Contact Information
 
-      If you have any questions about these Terms, please contact us at contact@librechat.ai.
+    #   If you have any questions about these Terms, please contact us at contact@librechat.ai.
 
-      By using the Website, you acknowledge that you have read these Terms of Service and agree to be bound by them.
+    #   By using the Website, you acknowledge that you have read these Terms of Service and agree to be bound by them.
 
   endpointsMenu: true
   modelSelect: false
@@ -67,11 +69,12 @@ interface:
   multiConvo: true
   agents: true
 
+
 # Definition of custom endpoints
 endpoints:
   custom:
     - name: "AskCTO"
-      apiKey: "sk-N2JvZTczN2EtMjE4Zi00ZjUyLTkxMDAtZDY4N2YxOTJhY2Q2ODc4YmFkNzE="
+      apiKey: "${CTO_API_KEY}"
       baseURL: "http://q-business-api-service:8080/v1/chat/completions"
       models:
         default: ["cto"]
