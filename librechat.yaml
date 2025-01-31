@@ -70,14 +70,14 @@ interface:
 # Definition of custom endpoints
 endpoints:
   custom:
-    - name: "Q Business"
-      apiKey: "sk-N2JvZTczN2EtMjE4Zi00ZjUyLTkxMDAtZDY4N2YxOTJhY2Q2ODc4YmFkNzE="  # Set this if needed; otherwise, leave as an empty string
-      baseURL: "http://q_business_api:8080/v1/chat/completions"
+    - name: "AskCTO"
+      apiKey: "sk-N2JvZTczN2EtMjE4Zi00ZjUyLTkxMDAtZDY4N2YxOTJhY2Q2ODc4YmFkNzE="
+      baseURL: "http://q-business-api-service:8080/v1/chat/completions"
       models:
-        default: ["q-business"]
+        default: ["cto"]
       titleConvo: true
       titleModel: "current_model"
       summarize: false
       forcePrompt: false
       directEndpoint: true
-      modelDisplayLabel: "Q Business"
+      modelDisplayLabel: "CTO"

@@ -3,7 +3,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install necessary dependencies for FastAPI and boto3
-RUN pip install fastapi uvicorn boto3 requests
+RUN pip install fastapi uvicorn boto3 requests pyjwt
 
 # Copy the server code
 COPY server.py /app/

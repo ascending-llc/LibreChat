@@ -1,531 +1,315 @@
-# from fastapi import FastAPI, Request, HTTPException
-# from fastapi.responses import StreamingResponse
-# from pydantic import BaseModel
-# import boto3
-# import json
-# import os
-# import logging
-
-# # Set up logging
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format="%(asctime)s [%(levelname)s] %(message)s",
-#     handlers=[
-#         logging.StreamHandler(),  # Log to the console
-#         logging.FileHandler("/app/openai_api.log")  # Log to a file in the container
-#     ]
-# )
-
-# logger = logging.getLogger(__name__)
-
-# # AWS configuration
-# AWS_REGION = os.getenv("AWS_REGION", "us-east-1")  # Default AWS region
-# APPLICATION_ID = os.getenv("APPLICATION_ID", "9f3542b8-2f5f-44ec-9ef8-df643041b5ea")  # Application ID for Q Business
-# Q_BUSINESS_CLIENT = boto3.client("qbusiness", region_name=AWS_REGION)
-
-# # Initialize FastAPI app
-# app = FastAPI()
-
-# # Define the request model
-# class ChatCompletionRequest(BaseModel):
-#     messages: list
-
-# @app.post("/v1/chat/completions")
-# async def chat_completions(request: ChatCompletionRequest):
-#     """
-#     Handles POST requests to /v1/chat/completions. Integrates with Amazon Q Business's chat_sync API.
-#     Converts the synchronous response into a streaming format.
-#     """
-#     logger.debug(f"Received request: {request}")
-    
-#     messages = request.messages
-
-#     # Prepare Q Business input
-#     input_text = "\n".join(
-#         msg["content"] for msg in messages if msg["role"] == "user"
-#     )
-
-#     logger.debug(f"Generated input text: {input_text}")
-
-#     try:
-#         # Call the Q Business chat_sync API
-#         response = Q_BUSINESS_CLIENT.chat_sync(
-#             applicationId=APPLICATION_ID,
-#             userMessage=input_text,  # Pass the user's input
-#         )
-#         logger.debug(f"Q Business API response: {response}")
-
-#         # Extract the response text
-#         response_text = response.get("systemMessage", "No response from Q Business.")
-#         tokens = response_text.split()  # Split response into tokens for streaming
-#         logger.debug(f"Tokenized response: {tokens}")
-
-#     except Exception as e:
-#         logger.error(f"Error calling Q Business API: {e}")
-#         tokens = ["Error", "connecting", "to", "Q", "Business."]
-
-#     # Stream tokens in OpenAI-style SSE
-#     async def stream_generator():
-#         for index, token in enumerate(tokens):
-#             chunk_json = {
-#                 "id": "chatcmpl-qbusiness",
-#                 "object": "chat.completion.chunk",
-#                 "created": 1234567890,
-#                 "model": "q-business-model",
-#                 "choices": [{
-#                     "delta": {
-#                         "role": "assistant",  # Add the role field here
-#                         "content": token
-#                     },
-#                     "index": 0,
-#                     "finish_reason": None if index < len(tokens) - 1 else "stop"
-#                 }]
-#             }
-#             yield f"data: {json.dumps(chunk_json)}\n\n"
-#         # Indicate the end of the stream
-#         yield "data: [DONE]\n\n"
-
-#     return StreamingResponse(stream_generator(), media_type="text/event-stream")
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     # Run FastAPI app
-#     uvicorn.run(app, host="0.0.0.0", port=8080)
-
-
-# from fastapi import FastAPI, Request, HTTPException
-# from fastapi.responses import StreamingResponse
-# from pydantic import BaseModel
-# import boto3
-# import json
-# import os
-# import logging
-# import requests
-
-# # Set up logging
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format="%(asctime)s [%(levelname)s] %(message)s",
-#     handlers=[
-#         logging.StreamHandler(),
-#         logging.FileHandler("/app/openai_api.log")
-#     ]
-# )
-
-# logger = logging.getLogger(__name__)
-
-# # Azure Entra ID configuration
-# AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
-# AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
-# AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
-# AZURE_OIDC_URL = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token"
-
-# # AWS configuration
-# AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-# APPLICATION_ID = os.getenv("APPLICATION_ID", "9f3542b8-2f5f-44ec-9ef8-df643041b5ea")
-# IAM_ROLE = os.getenv("IAM_ROLE")
-# IDC_APPLICATION_ID = os.getenv("IDC_APPLICATION_ID")
-
-# # Initialize FastAPI app
-# app = FastAPI()
-
-# # Define the request model
-# class ChatCompletionRequest(BaseModel):
-#     messages: list
-
-
-# def get_oidc_token_from_azure():
-#     """
-#     Retrieve an OIDC token from Azure Entra ID.
-#     """
-#     payload = {
-#         "client_id": AZURE_CLIENT_ID,
-#         "client_secret": AZURE_CLIENT_SECRET,
-#         "grant_type": "client_credentials",
-#         "scope": "https://graph.microsoft.com/.default",
-#     }
-#     response = requests.post(AZURE_OIDC_URL, data=payload)
-
-#     if response.status_code == 200:
-#         oidc_token = response.json().get("access_token")
-#         logger.info("Successfully retrieved OIDC token from Azure.")
-#         return oidc_token
-#     else:
-#         logger.error(f"Failed to retrieve OIDC token: {response.text}")
-#         raise Exception("Unable to fetch OIDC token from Azure.")
-
-
-# def exchange_azure_token_with_idc_token(oidc_token):
-#     """
-#     Exchange Azure OIDC token for AWS Identity Center token.
-#     """
-#     client = boto3.client("sso-oidc", region_name=AWS_REGION)
-#     response = client.create_token(
-#         clientId=IDC_APPLICATION_ID,
-#         grantType="urn:ietf:params:oauth:grant-type:jwt-bearer",
-#         assertion=oidc_token,  # Use the Azure OIDC token
-#     )
-#     return response.get("access_token")
-
-
-# def assume_role_with_idc_token(idc_token):
-#     """
-#     Assume an AWS IAM role using the AWS Identity Center token.
-#     """
-#     sts_client = boto3.client("sts", region_name=AWS_REGION)
-#     response = sts_client.assume_role_with_web_identity(
-#         RoleArn=IAM_ROLE,
-#         RoleSessionName="chat-sync-session",
-#         WebIdentityToken=idc_token,
-#     )
-#     return response["Credentials"]
-
-
-# @app.post("/v1/chat/completions")
-# async def chat_completions(request: ChatCompletionRequest):
-#     """
-#     Handles POST requests to /v1/chat/completions. Integrates with Amazon Q Business's chat_sync API.
-#     Converts the synchronous response into a streaming format.
-#     """
-#     logger.debug(f"Received request: {request}")
-#     messages = request.messages
-
-#     # Prepare Q Business input
-#     input_text = "\n".join(
-#         msg["content"] for msg in messages if msg["role"] == "user"
-#     )
-#     logger.debug(f"Generated input text: {input_text}")
-
-#     try:
-#         # Step 1: Retrieve OIDC token from Azure
-#         azure_oidc_token = get_oidc_token_from_azure()
-
-#         # Step 2: Exchange Azure OIDC token for AWS Identity Center token
-#         idc_token = exchange_azure_token_with_idc_token(azure_oidc_token)
-
-#         # Step 3: Assume IAM role using Identity Center token
-#         credentials = assume_role_with_idc_token(idc_token)
-
-#         # Step 4: Configure AWS client with temporary credentials
-#         qbusiness_client = boto3.client(
-#             "qbusiness",
-#             region_name=AWS_REGION,
-#             aws_access_key_id=credentials["AccessKeyId"],
-#             aws_secret_access_key=credentials["SecretAccessKey"],
-#             aws_session_token=credentials["SessionToken"],
-#         )
-
-#         # Call the Q Business chat_sync API
-#         response = qbusiness_client.chat_sync(
-#             applicationId=APPLICATION_ID,
-#             userMessage=input_text,
-#         )
-#         logger.debug(f"Q Business API response: {response}")
-
-#         # Extract the response text
-#         response_text = response.get("systemMessage", "No response from Q Business.")
-#         tokens = response_text.split()  # Split response into tokens for streaming
-#         logger.debug(f"Tokenized response: {tokens}")
-
-#     except Exception as e:
-#         logger.error(f"Error calling Q Business API: {e}")
-#         tokens = ["Error", "connecting", "to", "Q", "Business."]
-
-#     # Stream tokens in OpenAI-style SSE
-#     async def stream_generator():
-#         for index, token in enumerate(tokens):
-#             chunk_json = {
-#                 "id": "chatcmpl-qbusiness",
-#                 "object": "chat.completion.chunk",
-#                 "created": 1234567890,
-#                 "model": "q-business-model",
-#                 "choices": [{
-#                     "delta": {
-#                         "role": "assistant",
-#                         "content": token
-#                     },
-#                     "index": 0,
-#                     "finish_reason": None if index < len(tokens) - 1 else "stop"
-#                 }]
-#             }
-#             yield f"data: {json.dumps(chunk_json)}\n\n"
-#         yield "data: [DONE]\n\n"
-
-#     return StreamingResponse(stream_generator(), media_type="text/event-stream")
-
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8080)
-
-
-# from fastapi import FastAPI, Request
-# from fastapi.responses import StreamingResponse
-# from pydantic import BaseModel
-# import boto3
-# import json
-# import os
-# import logging
-# from typing import List, Dict, Any
-
-# # Configure logging
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-# )
-# logger = logging.getLogger(__name__)
-
-# # Configuration
-# class Config:
-#     AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-#     APPLICATION_ID = os.getenv("APPLICATION_ID")
-#     ROLE_ARN = os.getenv("ROLE_ARN")
-    
-#     # For IAM user authentication
-#     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-#     AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-#     AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
-
-# app = FastAPI()
-
-# class ChatMessage(BaseModel):
-#     role: str
-#     content: str
-
-# class ChatCompletionRequest(BaseModel):
-#     messages: List[ChatMessage]
-#     stream: bool = True
-
-# class QBusinessClient:
-#     def __init__(self):
-#         self.session = boto3.Session(
-#             aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
-#             aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
-#             aws_session_token=Config.AWS_SESSION_TOKEN,
-#             region_name=Config.AWS_REGION
-#         )
-        
-#         # If using role assumption
-#         if Config.ROLE_ARN:
-#             sts_client = self.session.client('sts')
-#             assumed_role = sts_client.assume_role(
-#                 RoleArn=Config.ROLE_ARN,
-#                 RoleSessionName='QBusinessSession'
-#             )
-            
-#             # Create new session with temporary credentials
-#             self.session = boto3.Session(
-#                 aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
-#                 aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
-#                 aws_session_token=assumed_role['Credentials']['SessionToken'],
-#                 region_name=Config.AWS_REGION
-#             )
-        
-#         self.client = self.session.client('qbusiness')
-
-#     async def chat_sync(self, message: str) -> Dict[str, Any]:
-#         try:
-#             response = self.client.chat_sync(
-#                 applicationId=Config.APPLICATION_ID,
-#                 userMessage=message
-#             )
-#             return response
-#         except Exception as e:
-#             logger.error(f"Error in chat_sync: {str(e)}")
-#             raise
-
-# @app.post("/v1/chat/completions")
-# async def chat_completions(request: ChatCompletionRequest):
-#     try:
-#         # Initialize Q Business client
-#         q_client = QBusinessClient()
-        
-#         # Extract the last user message
-#         user_messages = [msg.content for msg in request.messages if msg.role == "user"]
-#         if not user_messages:
-#             raise ValueError("No user messages found in the request")
-        
-#         last_message = user_messages[-1]
-        
-#         # Call Q Business API
-#         response = await q_client.chat_sync(last_message)
-        
-#         # Extract response text
-#         response_text = response.get("systemMessage", "No response received")
-#         tokens = response_text.split()  # Simple tokenization
-
-#         async def stream_generator():
-#             for i, token in enumerate(tokens):
-#                 chunk = {
-#                     "id": f"chatcmpl-{i}",
-#                     "object": "chat.completion.chunk",
-#                     "created": 1234567890,
-#                     "model": "amazon-q-business",
-#                     "choices": [{
-#                         "delta": {
-#                             "role": "assistant",
-#                             "content": token + " "
-#                         },
-#                         "index": 0,
-#                         "finish_reason": "stop" if i == len(tokens) - 1 else None
-#                     }]
-#                 }
-#                 yield f"data: {json.dumps(chunk)}\n\n"
-#             yield "data: [DONE]\n\n"
-
-#         return StreamingResponse(
-#             stream_generator(),
-#             media_type="text/event-stream"
-#         )
-
-#     except Exception as e:
-#         logger.error(f"Error processing request: {str(e)}")
-#         raise
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8080)
-
-
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+import requests
 import boto3
+import jwt
 import json
 import os
 import logging
-import requests
+import datetime
+from typing import List, Dict, Any
 
-# Set up logging
+# Set AWS region globally
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+
+# Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("/app/openai_api.log")
-    ]
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-
 logger = logging.getLogger(__name__)
 
-# Azure Entra ID configuration
-AZURE_CLIENT_ID = os.environ.get("AZURE_CLIENT_ID")
-AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET")
-AZURE_TENANT_ID = os.environ.get("AZURE_TENANT_ID")
-AZURE_OIDC_URL = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}/oauth2/v2.0/token"
+class SecretManager:
+    """Handles retrieval and updating of secrets in AWS Secrets Manager."""
 
-# AWS configuration
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-APPLICATION_ID = os.getenv("APPLICATION_ID", "9f3542b8-2f5f-44ec-9ef8-df643041b5ea")
+    SECRET_NAME = "q_business_api_config"
 
-# This IAM role must trust your Azure AD OIDC provider and allow sts:AssumeRoleWithWebIdentity
-IAM_ROLE = os.getenv("IAM_ROLE")
+    @staticmethod
+    def get_secret() -> Dict[str, str]:
+        """Retrieve a secret from AWS Secrets Manager."""
+        client = boto3.client("secretsmanager", region_name=AWS_REGION)
+        try:
+            response = client.get_secret_value(SecretId=SecretManager.SECRET_NAME)
+            secret_data = json.loads(response["SecretString"])
+            return secret_data
+        except Exception as e:
+            logger.error(f"Error retrieving secret {SecretManager.SECRET_NAME}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve secret: {SecretManager.SECRET_NAME}")
 
-# Initialize FastAPI app
+    @staticmethod
+    def update_secret(updated_fields: Dict[str, str]):
+        """Update specific fields in the existing secret in AWS Secrets Manager."""
+        client = boto3.client("secretsmanager", region_name=AWS_REGION)
+
+        try:
+            # Retrieve the current secret from Secrets Manager
+            current_secret = SecretManager.get_secret()
+
+            # Update only the specified fields
+            current_secret.update(updated_fields)
+
+            # Write back the updated secret to AWS Secrets Manager
+            client.put_secret_value(
+                SecretId=SecretManager.SECRET_NAME,
+                SecretString=json.dumps(current_secret)  # Save only the modified fields
+            )
+
+            logger.info(f"Successfully updated fields in secret: {SecretManager.SECRET_NAME}")
+        except Exception as e:
+            logger.error(f"Error updating secret {SecretManager.SECRET_NAME}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to update secret: {SecretManager.SECRET_NAME}")
+
+
+class Config:
+    """Loads application configuration from Secrets Manager."""
+    
+    @classmethod
+    def load(cls):
+        """Retrieve configuration from Secrets Manager."""
+        secret_data = SecretManager.get_secret()
+
+        cls.COGNITO_DOMAIN = secret_data.get("COGNITO_DOMAIN")
+        cls.CLIENT_ID = secret_data.get("CLIENT_ID")
+        cls.CLIENT_SECRET = secret_data.get("CLIENT_SECRET")
+        cls.REDIRECT_URI = secret_data.get("REDIRECT_URI")
+        cls.IAM_ROLE = secret_data.get("IAM_ROLE")
+        cls.IDC_APPLICATION_ID = secret_data.get("IDC_APPLICATION_ID")
+        cls.AMAZON_Q_APP_ID = secret_data.get("AMAZON_Q_APP_ID")
+        cls.TOKEN_ENDPOINT = f"{cls.COGNITO_DOMAIN}/oauth2/token"
+
+# Load configuration once at startup
+Config.load()
+
+class CognitoAuth:
+    """Handles authentication using Cognito and IAM Identity Center tokens."""
+
+    @staticmethod
+    def get_valid_idc_id_token() -> str:
+        """
+        Retrieves a valid IDC ID token.
+        If expired, refreshes it using Cognito ID token.
+        If missing, refresh Cognito ID token first, then exchange for IDC token.
+        """
+        secret_data = SecretManager.get_secret()
+        idc_id_token = secret_data.get("IDC_TOKEN")
+        cognito_refresh_token = secret_data.get("COGNITO_REFRESH_TOKEN")
+
+        if idc_id_token and not CognitoAuth._is_token_expired(idc_id_token):
+            logger.info("Using valid IDC ID token from Secrets Manager.")
+            return idc_id_token
+
+        if cognito_refresh_token:
+            if idc_id_token:
+                logger.info("IDC ID token expired. Attempting refresh using Cognito refresh token.")
+                new_idc_id_token = CognitoAuth._refresh_idc_id_token(cognito_refresh_token)
+            else:
+                logger.info("No valid IDC ID token found. Refreshing Cognito ID token first.")
+                new_cognito_id_token = CognitoAuth._refresh_cognito_id_token(cognito_refresh_token)
+                new_idc_id_token = CognitoAuth._exchange_token_with_identity_center(new_cognito_id_token)
+
+            CognitoAuth._store_idc_tokens(new_idc_id_token, cognito_refresh_token)
+            return new_idc_id_token
+
+        raise HTTPException(status_code=500, detail="No valid IDC ID token and no Cognito refresh token available.")
+
+    @staticmethod
+    def _is_token_expired(token: str) -> bool:
+        """Check if the token is expired."""
+        try:
+            decoded = jwt.decode(token, options={"verify_signature": False})
+            exp_timestamp = decoded.get("exp")
+            if exp_timestamp is None:
+                logger.warning("Token does not have an 'exp' claim.")
+                return True
+            # Convert expiration timestamp to UTC datetime
+            exp_dt = datetime.datetime.fromtimestamp(exp_timestamp, datetime.timezone.utc)
+
+            # Get current UTC time
+            now = datetime.datetime.now(datetime.timezone.utc)
+
+            # Check if the token is expired, allowing a 30-second leeway for clock skew
+            return now >= exp_dt - datetime.timedelta(seconds=30)
+        except Exception as e:
+            logger.error(f"Error decoding token: {e}")
+            return True
+
+    @staticmethod
+    def _refresh_cognito_id_token(refresh_token: str) -> str:
+        """Refresh Cognito ID token."""
+        try:
+            response = requests.post(
+                Config.TOKEN_ENDPOINT,
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": Config.CLIENT_ID,
+                    "client_secret": Config.CLIENT_SECRET,
+                    "refresh_token": refresh_token,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            )
+            response.raise_for_status()
+            return response.json()["id_token"]
+        except requests.RequestException as e:
+            logger.error(f"Error refreshing Cognito ID token: {e}")
+            raise HTTPException(status_code=500, detail="Failed to refresh Cognito ID token.")
+
+    @staticmethod
+    def _refresh_idc_id_token(refresh_token: str) -> str:
+        """Refresh IDC ID token."""
+        try:
+            client = boto3.client("sso-oidc", region_name=AWS_REGION)
+            response = client.create_token_with_iam(
+                clientId=Config.IDC_APPLICATION_ID,
+                grantType="refresh_token",
+                refreshToken=refresh_token,
+            )
+            return response.get("idToken")
+        except Exception as e:
+            logger.warning(f"Failed to refresh IDC ID token: {e}")
+            return None
+
+    @staticmethod
+    def _exchange_token_with_identity_center(id_token: str) -> tuple:
+        """Exchange Cognito ID token for IDC ID token."""
+        try:
+            client = boto3.client("sso-oidc", region_name=AWS_REGION)
+            response = client.create_token_with_iam(
+                clientId=Config.IDC_APPLICATION_ID,
+                grantType="urn:ietf:params:oauth:grant-type:jwt-bearer",
+                assertion=id_token,
+            )
+            return response["idToken"]
+        except Exception as e:
+            logger.error(f"Error exchanging token with Identity Center: {e}")
+            raise HTTPException(status_code=500, detail="Failed to exchange Cognito ID token with Identity Center.")
+        
+    @staticmethod
+    def assume_role_with_token(iam_token: str):
+        """Assume the IAM role using the IAM OIDC token."""
+        decoded_token = jwt.decode(iam_token, options={"verify_signature": False})
+        sts_client = boto3.client("sts", region_name=AWS_REGION)
+        try:
+            response = sts_client.assume_role(
+                RoleArn=Config.IAM_ROLE,
+                RoleSessionName="qapp",
+                ProvidedContexts=[
+                    {
+                        "ProviderArn": "arn:aws:iam::aws:contextProvider/IdentityCenter",
+                        "ContextAssertion": decoded_token["sts:identity_context"],
+                    }
+                ],
+            )
+            return response["Credentials"]
+        except Exception as e:
+            logger.error(f"Error assuming role with token: {e}")
+            raise
+
+    @staticmethod
+    def _store_idc_tokens(idc_id_token: str, cognito_refresh_token: str):
+        """Store only IDC ID token and Cognito refresh token in Secrets Manager without overwriting other values."""
+        SecretManager.update_secret({
+            "IDC_TOKEN": idc_id_token,
+            "COGNITO_REFRESH_TOKEN": cognito_refresh_token
+        })
+
 app = FastAPI()
 
-# Define the request model
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
 class ChatCompletionRequest(BaseModel):
-    messages: list
+    messages: List[ChatMessage]
+    stream: bool = True
 
-def get_oidc_token_from_azure():
-    """
-    Retrieve an OIDC token from Azure Entra ID using client_credentials grant.
-    Make sure your Azure AD app registration is configured for the correct scope.
-    """
-    payload = {
-        "client_id": AZURE_CLIENT_ID,
-        "client_secret": AZURE_CLIENT_SECRET,
-        "grant_type": "client_credentials",
-        # Replace this scope with what your Azure app registration requires
-        "scope": "https://graph.microsoft.com/.default",
-    }
-    response = requests.post(AZURE_OIDC_URL, data=payload)
+class QBusinessClient:
+    def __init__(self, aws_credentials: Dict[str, str]):
+        self.session = boto3.Session(
+            aws_access_key_id=aws_credentials["AccessKeyId"],
+            aws_secret_access_key=aws_credentials["SecretAccessKey"],
+            aws_session_token=aws_credentials["SessionToken"],
+        )
+        self.client = self.session.client("qbusiness", region_name=AWS_REGION)
 
-    if response.status_code == 200:
-        oidc_token = response.json().get("access_token")
-        logger.info("Successfully retrieved OIDC token from Azure.")
-        return oidc_token
-    else:
-        logger.error(f"Failed to retrieve OIDC token: {response.text}")
-        raise Exception("Unable to fetch OIDC token from Azure.")
+    async def chat_sync(self, message: str, conversation_id="", parent_message_id="") -> Dict[str, Any]:
+        """Call Q Business API to get a response."""
+        try:
+            if conversation_id:
+                response = self.client.chat_sync(
+                    applicationId=Config.AMAZON_Q_APP_ID,
+                    userMessage=message,
+                    conversationId=conversation_id,
+                    parentMessageId=parent_message_id,
+                    chatMode='CREATOR_MODE'
+                )
+            else:
+                response = self.client.chat_sync(
+                    applicationId=Config.AMAZON_Q_APP_ID,
+                    userMessage=message,
+                    chatMode='CREATOR_MODE'
+                )
+            return response
+        except Exception as e:
+            logger.error(f"Error in chat_sync: {e}")
+            raise
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
-    """
-    Handles POST requests to /v1/chat/completions. Integrates with Amazon Q Business's chat_sync API.
-    Converts the synchronous response into a streaming format.
-    """
-    logger.debug(f"Received request: {request}")
-    messages = request.messages
-
-    # Prepare Q Business input
-    input_text = "\n".join(
-        msg["content"] for msg in messages if msg["role"] == "user"
-    )
-    logger.debug(f"Generated input text: {input_text}")
-
     try:
-        # 1. Retrieve OIDC token from Azure
-        azure_oidc_token = get_oidc_token_from_azure()
+        # Retrieve a valid access token from Secrets Manager
+        idc_id_token = CognitoAuth.get_valid_idc_id_token()
+        if not idc_id_token:
+            raise HTTPException(status_code=500, detail="Failed to retrieve a valid idc id token.")
+        
+        # Assume IAM role using the IAM token
+        aws_credentials = CognitoAuth.assume_role_with_token(idc_id_token)
 
-        # 2. Call STS to assume role with web identity (the Azure OIDC token)
-        sts_client = boto3.client("sts", region_name=AWS_REGION)
-        assume_response = sts_client.assume_role_with_web_identity(
-            RoleArn=IAM_ROLE,
-            RoleSessionName="chat-sync-session",
-            WebIdentityToken=azure_oidc_token
+        # Initialize Q Business client
+        q_client = QBusinessClient(aws_credentials)
+
+        # Extract the last user message
+        user_messages = [msg.content for msg in request.messages if msg.role == "user"]
+        if not user_messages:
+            raise HTTPException(status_code=400, detail="No user messages found in the request.")
+
+        last_message = user_messages[-1]
+
+        # Call Q Business API
+        response = await q_client.chat_sync(last_message)
+
+        # Extract response text
+        response_text = response.get("systemMessage", "No response received")
+        tokens = response_text.split()  # Simple tokenization
+
+        async def stream_generator():
+            for i, token in enumerate(tokens):
+                chunk = {
+                    "id": f"chatcmpl-{i}",
+                    "object": "chat.completion.chunk",
+                    "created": 1234567890,
+                    "model": "amazon-q-business",
+                    "choices": [{
+                        "delta": {
+                            "role": "assistant",
+                            "content": token + " "
+                        },
+                        "index": 0,
+                        "finish_reason": "stop" if i == len(tokens) - 1 else None
+                    }]
+                }
+                yield f"data: {json.dumps(chunk)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/event-stream"
         )
-        credentials = assume_response["Credentials"]
-
-        # 3. Configure QBusiness client with these temporary credentials
-        qbusiness_client = boto3.client(
-            "qbusiness",
-            region_name=AWS_REGION,
-            aws_access_key_id=credentials["AccessKeyId"],
-            aws_secret_access_key=credentials["SecretAccessKey"],
-            aws_session_token=credentials["SessionToken"],
-        )
-
-        # 4. Call the Q Business chat_sync API
-        response = qbusiness_client.chat_sync(
-            applicationId=APPLICATION_ID,
-            userMessage=input_text,
-        )
-        logger.debug(f"Q Business API response: {response}")
-
-        # 5. Extract the response text
-        response_text = response.get("systemMessage", "No response from Q Business.")
-        tokens = response_text.split()  # Split response into tokens for streaming
-        logger.debug(f"Tokenized response: {tokens}")
 
     except Exception as e:
-        logger.error(f"Error calling Q Business API: {e}")
-        tokens = ["Error", "connecting", "to", "Q", "Business."]
-
-    # Stream tokens in OpenAI-style SSE
-    async def stream_generator():
-        for index, token in enumerate(tokens):
-            chunk_json = {
-                "id": "chatcmpl-qbusiness",
-                "object": "chat.completion.chunk",
-                "created": 1234567890,
-                "model": "q-business-model",
-                "choices": [{
-                    "delta": {
-                        "role": "assistant",
-                        "content": token
-                    },
-                    "index": 0,
-                    "finish_reason": None if index < len(tokens) - 1 else "stop"
-                }]
-            }
-            yield f"data: {json.dumps(chunk_json)}\n\n"
-        yield "data: [DONE]\n\n"
-
-    return StreamingResponse(stream_generator(), media_type="text/event-stream")
-
-
+        logger.error(f"Error processing request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
