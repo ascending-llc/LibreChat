@@ -55,12 +55,13 @@ bower_components/
 .flooignore
 
 #config file
+
 # librechat.yaml
 
 
 # Environment
 .npmrc
-# .env*
+.env*
 my.secrets
 !**/.env.example
 !**/.env.test.example
@@ -87,7 +88,6 @@ junit.xml
 **/venv/
 
 # docker override file
-
 # docker-compose.override.yaml
 
 
