@@ -8,13 +8,26 @@ services:
       - "8080:8080"
     # env_file:
     #   - ./q_business/.env
+  # api:
+  #   image: librechat
+  #   build:
+  #     context: .
+  #     target: node
+  #   depends_on:
+  #     - q_business_api
+  #   environment:
+  #     - HOST=0.0.0.0
+  #     - Q_BUSINESS_API_BASE_URL=http://q-business-api-service:8080/v1/chat/completions
+  #   volumes:
+  #     - type: bind
+  #       source: ./librechat.yaml
+  #       target: /app/librechat.yaml
   api:
-    depends_on:
-      - q_business_api
-    environment:
-      - HOST=0.0.0.0
-      - Q_BUSINESS_API_BASE_URL=http://q-business-api-service:8080/v1/chat/completions
-    volumes:
-      - type: bind
-        source: ./librechat.yaml
-        target: /app/librechat.yaml
+    profiles:
+      - donotstart
+  mongodb:
+    ports:
+      - 27017:27017
+  meilisearch:
+    ports:
+      - 7700:7700
