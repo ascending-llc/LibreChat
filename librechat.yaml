@@ -71,13 +71,18 @@ interface:
 
 
 # Definition of custom endpoints
+# https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/custom_endpoint
 endpoints:
   custom:
     - name: "AskCTO"
       apiKey: "${CTO_API_KEY}"
       baseURL: "http://q-business-api-service:8080/v1/chat/completions"
+      # for local testing
+      # baseURL: "http://localhost:8080/v1/chat/completions"
+      iconURL: "https://ascendingdc.com/logo192.png"
       models:
         default: ["cto"]
+      userIdQuery: true
       titleConvo: true
       titleModel: "current_model"
       summarize: false
