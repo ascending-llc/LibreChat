@@ -62,7 +62,7 @@ interface:
       📧 support@ascendingdc.com
 
 
-  endpointsMenu: true
+  endpointsMenu: false
   modelSelect: false
   parameters: true
   sidePanel: true
