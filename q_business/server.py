@@ -255,6 +255,7 @@ class QBusinessClient:
                     userMessage=message,
                     chatMode='CREATOR_MODE'
                 )
+            # logger.info(f"Q Business response: {response}")
             return response
         except Exception as e:
             logger.error(f"Error in chat_sync: {e}")
@@ -263,7 +264,8 @@ class QBusinessClient:
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     try:
-
+        # logger.info(f"Received request: {request.dict()}")
+        
         # Retrieve a valid access token from Secrets Manager
         idc_id_token = CognitoAuth.get_valid_idc_id_token()
         if not idc_id_token:
@@ -280,9 +282,31 @@ async def chat_completions(request: ChatCompletionRequest):
             {"role": msg.role, "content": msg.content} for msg in request.messages
         ]
 
+        # logger.info(f"Sending conversation history to Q Business API: {json.dumps(conversation_messages, indent=2)}")
+
+        # If the last message is from the system, return a non-streaming response
+        if conversation_messages[-1]["role"] == "system":
+            formatted_conversation = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in conversation_messages])
+            response = await q_client.chat_sync(formatted_conversation)
+            response_text = response.get("systemMessage", "No response received")
+            return {
+                "id": "chatcmpl-system",
+                "object": "chat.completion",
+                "created": int(datetime.datetime.now(datetime.timezone.utc).timestamp()),
+                "model": "askcto",
+                "choices": [{
+                    "message": {
+                        "role": "system",
+                        "content": response_text
+                    },
+                    "index": 0,
+                    "finish_reason": "stop"
+                }]
+            }
+
         # Ensure at least one user message is present
-        if not any(msg["role"] == "user" for msg in conversation_messages):
-            raise HTTPException(status_code=400, detail="No user messages found in the request.")
+        # if not any(msg["role"] == "user" for msg in conversation_messages):
+        #     raise HTTPException(status_code=400, detail="No user messages found in the request.")
 
         # Convert conversation history into a readable string format for the API
         formatted_conversation = "\n".join([f"{msg['role'].capitalize()}: {msg['content']}" for msg in conversation_messages])
@@ -329,8 +353,8 @@ async def chat_completions(request: ChatCompletionRequest):
                 chunk = {
                     "id": f"chatcmpl-{i}",
                     "object": "chat.completion.chunk",
-                    "created": 1234567890,
-                    "model": "amazon-q-business",
+                    "created": int(datetime.datetime.now(datetime.timezone.utc).timestamp()),
+                    "model": "askcto",
                     "choices": [{
                         "delta": {
                             "role": "assistant",
