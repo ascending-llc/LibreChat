@@ -292,8 +292,8 @@ async def chat_completions(request: ChatCompletionRequest):
             return {
                 "id": "chatcmpl-system",
                 "object": "chat.completion",
-                "created": 1234567890,
-                "model": "amazon-q-business",
+                "created": int(datetime.datetime.now(datetime.timezone.utc).timestamp()),
+                "model": "askcto",
                 "choices": [{
                     "message": {
                         "role": "system",
@@ -353,8 +353,8 @@ async def chat_completions(request: ChatCompletionRequest):
                 chunk = {
                     "id": f"chatcmpl-{i}",
                     "object": "chat.completion.chunk",
-                    "created": 1234567890,
-                    "model": "amazon-q-business",
+                    "created": int(datetime.datetime.now(datetime.timezone.utc).timestamp()),
+                    "model": "askcto",
                     "choices": [{
                         "delta": {
                             "role": "assistant",
