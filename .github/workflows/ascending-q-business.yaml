@@ -1,0 +1,122 @@
+name: Backend API CI/CD Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        type: choice
+        required: true
+        default: dev
+        options:
+          - dev
+          - prod
+      region:
+        description: 'AWS Region to deploy to'
+        type: string
+        required: true
+        default: us-east-1
+
+permissions:
+  id-token: write 
+  contents: read 
+jobs:
+  build_and_test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Assume IAM role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: deployment-role-session
+          aws-region: ${{ inputs.region }}
+      
+      - name: Test AWS Connection
+        run: aws sts get-caller-identity
+
+      # - name: Run Unit Tests
+      #   run: python -m pytest
+  
+  package_and_push:
+    name: Package and Push
+    runs-on: ubuntu-latest
+    needs: build_and_test
+    outputs:
+      ecr_repo: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+    
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Assume IAM role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: deployment-role-session
+          aws-region: ${{ inputs.region }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Build, tag, and push docker image to Amazon ECR
+        uses: docker/build-push-action@v6
+        with: 
+          platforms: linux/arm64
+          context: .
+          file: ./Dockerfile
+          build-args: |
+            environment=${{ inputs.environment }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/s_api_backend_${{ inputs.environment }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/s_api_backend_${{ inputs.environment }}:latest
+          provenance: false
+  deploy-backend-api-to-eks:
+    name: Deploy Backend to EKS
+    runs-on: ubuntu-latest
+    needs: package_and_push
+    env:
+      EKS_CLUSTER_NAME: ascending-s-api-cluster
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: latest
+        id: install
+      
+      - name: Assume IAM role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: deployment-role-session
+          aws-region: ${{ inputs.region }}
+      
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ inputs.region }}
+      
+      - name: Update the backend image on EKS
+        env:
+          backend_image: ${{ needs.package_and_push.outputs.ecr_repo }}/s_api_backend_${{ inputs.environment }}:${{ github.sha }}
+        run: kubectl set image deployments/backend-api-deployment backend-api-container=$backend_image -n s-api
+
+      - name: EKS pod status check
+        run: kubectl rollout status deployments/backend-api-deployment -n s-api
