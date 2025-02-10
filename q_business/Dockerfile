@@ -5,16 +5,13 @@ FROM node:20.8.1
 WORKDIR /app
 
 # Copy package.json and package-lock.json before installing dependencies
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json server.js ./
 
 # Install dependencies
 RUN npm install
 
 # Install PM2 globally
 RUN npm install -g pm2
-
-# Copy the rest of the application files
-COPY . .
 
 # Expose the application port
 EXPOSE 8080
