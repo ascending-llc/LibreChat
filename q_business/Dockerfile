@@ -1,13 +1,23 @@
-FROM python:3.10-slim
+# Use an official Node.js runtime as a parent image
+FROM node:20.8.1
 
+# Set the working directory inside the container
 WORKDIR /app
 
-# Install necessary dependencies for FastAPI and boto3
-RUN pip install fastapi uvicorn boto3 requests pyjwt
+# Copy package.json and package-lock.json before installing dependencies
+COPY package.json package-lock.json ./
 
-# Copy the server code
-COPY server.py /app/
+# Install dependencies
+RUN npm install
 
+# Install PM2 globally
+RUN npm install -g pm2
+
+# Copy the rest of the application files
+COPY . .
+
+# Expose the application port
 EXPOSE 8080
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+# Start the application using PM2
+CMD ["pm2-runtime", "start", "server.js"]
