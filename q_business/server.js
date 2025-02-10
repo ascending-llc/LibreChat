@@ -6,8 +6,23 @@ import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { SSOOIDCClient, CreateTokenWithIAMCommand } from "@aws-sdk/client-sso-oidc";
 import { QBusinessClient, ChatCommand, ChatSyncCommand } from "@aws-sdk/client-qbusiness";
+import winston from 'winston';
 
 dotenv.config();
+
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.printf(({ timestamp, level, message }) => {
+            return `${timestamp} [${level.toUpperCase()}]: ${message}`;
+        })
+    ),
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: 'app.log' })
+    ]
+});
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -26,7 +41,7 @@ async function getSecret() {
         const response = await secretsClient.send(command);
         return JSON.parse(response.SecretString);
     } catch (error) {
-        console.error(`Error retrieving secret: ${error}`);
+        logger.error(`Error retrieving secret: ${error}`);
         throw new Error("Failed to retrieve secret");
     }
 }
@@ -34,7 +49,7 @@ async function getSecret() {
 async function refreshCognitoIdToken(refreshToken) {
     try {
         const secretData = await getSecret();
-        console.log("Starting Refresh Cognito ID token");
+        logger.info("Starting Refresh Cognito ID token");
         
         const tokenEndpoint = `${secretData.COGNITO_DOMAIN}/oauth2/token`;
         const payload = {
@@ -44,16 +59,16 @@ async function refreshCognitoIdToken(refreshToken) {
             refresh_token: refreshToken
         };
         
-        console.log("Sending token refresh request...");
+        logger.info("Sending token refresh request...");
 
         const response = await axios.post(tokenEndpoint, payload, {
             headers: { "Content-Type": "application/x-www-form-urlencoded" }
         });
 
-        console.log("Token refresh successful");
+        logger.info("Token refresh successful");
         return response.data.id_token;
     } catch (error) {
-        console.error("Error refreshing Cognito ID token:", error.response ? error.response.data : error.message);
+        logger.error("Error refreshing Cognito ID token:", error.response ? error.response.data : error.message);
         throw new Error("Failed to refresh Cognito ID token.");
     }
 }
@@ -61,7 +76,7 @@ async function refreshCognitoIdToken(refreshToken) {
 
 async function exchangeTokenWithIdentityCenter(idToken) {
     try {
-        console.log("Exchanging Cognito ID token with Identity Center...");
+        logger.info("Exchanging Cognito ID token with Identity Center...");
         const secretData = await getSecret();
         
         const command = new CreateTokenWithIAMCommand({
@@ -70,17 +85,17 @@ async function exchangeTokenWithIdentityCenter(idToken) {
             assertion: idToken,
         });
         
-        console.log("Sending CreateTokenCommand to AWS SSO OIDC...");
+        logger.info("Sending CreateTokenCommand to AWS SSO OIDC...");
         const response = await ssoOidcClient.send(command);
         
         if (!response || !response.idToken) {
             throw new Error("Failed to exchange token with Identity Center. Response missing idToken.");
         }
         
-        console.log("Token exchanged successfully with Identity Center.");
+        logger.info("Token exchanged successfully with Identity Center.");
         return response.idToken;
     } catch (error) {
-        console.error("Error exchanging token with Identity Center:", error);
+        logger.error("Error exchanging token with Identity Center:", error);
         throw new Error("Failed to exchange Cognito ID token with Identity Center.");
     }
 }
@@ -96,7 +111,7 @@ async function updateSecret(updatedFields) {
         });
         await secretsClient.send(command);
     } catch (error) {
-        console.error(`Error updating secret: ${error}`);
+        logger.error(`Error updating secret: ${error}`);
         throw new Error("Failed to update secret");
     }
 }
@@ -107,12 +122,12 @@ async function getValidIDCIdToken() {
     const cognitoRefreshToken = secretData.COGNITO_REFRESH_TOKEN;
 
     if (idcIdToken && !isTokenExpired(idcIdToken)) {
-        console.log("Using valid IDC ID token from Secrets Manager.");
+        logger.info("Using valid IDC ID token from Secrets Manager.");
         return idcIdToken;
     }
 
     if (cognitoRefreshToken) {
-        console.log("No valid IDC ID token found. Refreshing Cognito ID token first.")
+        logger.info("No valid IDC ID token found. Refreshing Cognito ID token first.")
         const newCognitoIdToken = await refreshCognitoIdToken(cognitoRefreshToken);
         const newIdcIdToken = await exchangeTokenWithIdentityCenter(newCognitoIdToken);
         await updateSecret({ IDC_TOKEN: newIdcIdToken, COGNITO_REFRESH_TOKEN: cognitoRefreshToken });
@@ -148,14 +163,14 @@ async function assumeRoleWithToken(iamToken) {
 
 app.post("/v1/chat/completions", async (req, res) => {
     try {
-        // console.log("Received request:", JSON.stringify(req.body, null, 2));
+        // logger.info("Received request:", JSON.stringify(req.body, null, 2));
         const idcIdToken = await getValidIDCIdToken();
-        console.log("Retrieved IDC ID Token");
+        logger.info("Retrieved IDC ID Token");
         const awsCredentials = await assumeRoleWithToken(idcIdToken);
-        console.log("Assumed role with token");
+        logger.info("Assumed role with token");
         
         const secretData = await getSecret();
-        console.log("Retrieved secret data");
+        logger.info("Retrieved secret data");
 
         const qBusinessClient = new QBusinessClient({
             region: AWS_REGION,
@@ -165,30 +180,30 @@ app.post("/v1/chat/completions", async (req, res) => {
                 sessionToken: awsCredentials.SessionToken
             }
         });
-        console.log("Initialized QBusinessClient");
+        logger.info("Initialized QBusinessClient");
 
         const conversationMessages = req.body.messages?.map(msg => ({
             role: msg.role,
             content: msg.content
         })) || [];
         
-        console.log("Processed conversation messages.");
+        logger.info("Processed conversation messages.");
         
         if (!conversationMessages || conversationMessages.length === 0) {
-            console.error("conversationMessages is empty or undefined!");
+            logger.error("conversationMessages is empty or undefined!");
         }
 
         const lastMessage = conversationMessages[conversationMessages.length - 1];
 
         if (lastMessage.role === "system") {
-            console.log("Handling system message");
+            logger.info("Handling system message");
             const chatSyncCommand = new ChatSyncCommand({
                 applicationId: secretData.AMAZON_Q_APP_ID,
                 userMessage: JSON.stringify(lastMessage),
                 chatMode: "CREATOR_MODE"
             });
             const chatSyncResponse = await qBusinessClient.send(chatSyncCommand);
-            console.log("Received chatSyncResponse");
+            logger.info("Received chatSyncResponse");
             return res.json({
                 id: "chatcmpl-system",
                 object: "chat.completion",
@@ -202,7 +217,7 @@ app.post("/v1/chat/completions", async (req, res) => {
             });
         }
 
-        console.log("Handling normal chat message");
+        logger.info("Handling normal chat message");
         const conversationMessagesString = JSON.stringify(conversationMessages);
 
         // Create an async generator function for inputStream events
@@ -224,9 +239,9 @@ app.post("/v1/chat/completions", async (req, res) => {
         }
         const chatCommand = new ChatCommand(input);
 
-        console.log("Sending chat command");
+        logger.info("Sending chat command");
         const response = await qBusinessClient.send(chatCommand);
-        console.log("Received response from QBusiness API");
+        logger.info("Received response from QBusiness API");
 
         // Set up SSE headers.
         res.setHeader("Content-Type", "text/event-stream");
@@ -269,9 +284,9 @@ app.post("/v1/chat/completions", async (req, res) => {
         res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
         res.end();
     } catch (error) {
-        console.error(`Error processing request: ${error}`);
+        logger.error(`Error processing request: ${error}`);
         res.status(500).json({ error: error.message });
     }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));

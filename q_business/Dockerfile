@@ -10,11 +10,14 @@ COPY package.json package-lock.json ./
 # Install dependencies
 RUN npm install
 
+# Install PM2 globally
+RUN npm install -g pm2
+
 # Copy the rest of the application files
 COPY . .
 
 # Expose the application port
 EXPOSE 8080
 
-# Start the application
-CMD ["node", "server.js"]
+# Start the application using PM2
+CMD ["pm2-runtime", "start", "server.js"]
