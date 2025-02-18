@@ -4,8 +4,8 @@ FROM node:20.8.1
 # Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json before installing dependencies
-COPY package.json package-lock.json server.js ./
+# Copy all files except those specified in .dockerignore (like .env)
+COPY . .
 
 # Install dependencies
 RUN npm install

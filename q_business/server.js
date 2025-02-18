@@ -1,12 +1,10 @@
-import express, { application } from 'express';
-import { SecretsManagerClient, GetSecretValueCommand, PutSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import express from 'express';
 import { STSClient, AssumeRoleCommand } from "@aws-sdk/client-sts";
-import axios from 'axios';
+import { QBusinessClient, ChatCommand, ChatSyncCommand } from "@aws-sdk/client-qbusiness";
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
-import { SSOOIDCClient, CreateTokenWithIAMCommand } from "@aws-sdk/client-sso-oidc";
-import { QBusinessClient, ChatCommand, ChatSyncCommand } from "@aws-sdk/client-qbusiness";
 import winston from 'winston';
+import { TokenManager } from './TokenManager.js';
 
 dotenv.config();
 
@@ -27,126 +25,14 @@ const logger = winston.createLogger({
 const app = express();
 const PORT = process.env.PORT || 8080;
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
-const SECRET_NAME = "q_business_api_config";
-
-const secretsClient = new SecretsManagerClient({ region: AWS_REGION });
 const stsClient = new STSClient({ region: AWS_REGION });
-const ssoOidcClient = new SSOOIDCClient({ region: AWS_REGION });
 
 app.use(express.json());
 
-async function getSecret() {
-    try {
-        const command = new GetSecretValueCommand({ SecretId: SECRET_NAME });
-        const response = await secretsClient.send(command);
-        return JSON.parse(response.SecretString);
-    } catch (error) {
-        logger.error(`Error retrieving secret: ${error}`);
-        throw new Error("Failed to retrieve secret");
-    }
-}
-
-async function refreshCognitoIdToken(refreshToken) {
-    try {
-        const secretData = await getSecret();
-        logger.info("Starting Refresh Cognito ID token");
-        
-        const tokenEndpoint = `${secretData.COGNITO_DOMAIN}/oauth2/token`;
-        const payload = {
-            grant_type: "refresh_token",
-            client_id: secretData.CLIENT_ID,
-            client_secret: secretData.CLIENT_SECRET,
-            refresh_token: refreshToken
-        };
-        
-        logger.info("Sending token refresh request...");
-
-        const response = await axios.post(tokenEndpoint, payload, {
-            headers: { "Content-Type": "application/x-www-form-urlencoded" }
-        });
-
-        logger.info("Token refresh successful");
-        return response.data.id_token;
-    } catch (error) {
-        logger.error("Error refreshing Cognito ID token:", error.response ? error.response.data : error.message);
-        throw new Error("Failed to refresh Cognito ID token.");
-    }
-}
-
-
-async function exchangeTokenWithIdentityCenter(idToken) {
-    try {
-        logger.info("Exchanging Cognito ID token with Identity Center...");
-        const secretData = await getSecret();
-        
-        const command = new CreateTokenWithIAMCommand({
-            clientId: secretData.IDC_APPLICATION_ID,
-            grantType: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-            assertion: idToken,
-        });
-        
-        logger.info("Sending CreateTokenCommand to AWS SSO OIDC...");
-        const response = await ssoOidcClient.send(command);
-        
-        if (!response || !response.idToken) {
-            throw new Error("Failed to exchange token with Identity Center. Response missing idToken.");
-        }
-        
-        logger.info("Token exchanged successfully with Identity Center.");
-        return response.idToken;
-    } catch (error) {
-        logger.error("Error exchanging token with Identity Center:", error);
-        throw new Error("Failed to exchange Cognito ID token with Identity Center.");
-    }
-}
-
-async function updateSecret(updatedFields) {
-    try {
-        const currentSecret = await getSecret();
-        Object.assign(currentSecret, updatedFields);
-        
-        const command = new PutSecretValueCommand({
-            SecretId: SECRET_NAME,
-            SecretString: JSON.stringify(currentSecret)
-        });
-        await secretsClient.send(command);
-    } catch (error) {
-        logger.error(`Error updating secret: ${error}`);
-        throw new Error("Failed to update secret");
-    }
-}
-
-async function getValidIDCIdToken() {
-    const secretData = await getSecret();
-    const idcIdToken = secretData.IDC_TOKEN;
-    const cognitoRefreshToken = secretData.COGNITO_REFRESH_TOKEN;
-
-    if (idcIdToken && !isTokenExpired(idcIdToken)) {
-        logger.info("Using valid IDC ID token from Secrets Manager.");
-        return idcIdToken;
-    }
-
-    if (cognitoRefreshToken) {
-        logger.info("No valid IDC ID token found. Refreshing Cognito ID token first.")
-        const newCognitoIdToken = await refreshCognitoIdToken(cognitoRefreshToken);
-        const newIdcIdToken = await exchangeTokenWithIdentityCenter(newCognitoIdToken);
-        await updateSecret({ IDC_TOKEN: newIdcIdToken, COGNITO_REFRESH_TOKEN: cognitoRefreshToken });
-        return newIdcIdToken;
-    }
-    throw new Error("No valid IDC ID token and no Cognito refresh token available.");
-}
-
-function isTokenExpired(token) {
-    try {
-        const decoded = jwt.decode(token);
-        return Date.now() >= decoded.exp * 1000;
-    } catch (error) {
-        return true;
-    }
-}
-
 async function assumeRoleWithToken(iamToken) {
-    const secretData = await getSecret();
+    const tokenManager = new TokenManager();
+    // const secretData = await getSecret();
+    const secretData = await tokenManager.getSecret();
     const roleArn = secretData.IAM_ROLE;
     const decodedToken = jwt.decode(iamToken);
     const command = new AssumeRoleCommand({
@@ -164,13 +50,20 @@ async function assumeRoleWithToken(iamToken) {
 app.post("/v1/chat/completions", async (req, res) => {
     try {
         // logger.info("Received request:", JSON.stringify(req.body, null, 2));
-        const idcIdToken = await getValidIDCIdToken();
+        const tokenManager = new TokenManager();
+        const idcIdToken = await tokenManager.getValidIDCIdToken();
         logger.info("Retrieved IDC ID Token");
+        // const idcIdToken = await getValidIDCIdToken();
+        // logger.info("Retrieved IDC ID Token");
         const awsCredentials = await assumeRoleWithToken(idcIdToken);
         logger.info("Assumed role with token");
-        
-        const secretData = await getSecret();
+
+        // Retrieve secret data for additional parameters
+        const secretData = await tokenManager.getSecret();
         logger.info("Retrieved secret data");
+        
+        // const secretData = await getSecret();
+        // logger.info("Retrieved secret data");
 
         const qBusinessClient = new QBusinessClient({
             region: AWS_REGION,
