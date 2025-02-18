@@ -214,6 +214,10 @@ endpoints:
       # The label displayed for the AI model in messages.
       modelDisplayLabel: 'Mistral' # Default is "AI" when not set.
 
+
+      # In case the custom endpoint has built-in RAG, set this to true.
+      # buildInRag: true 
+
       # Add additional parameters to the request. Default params will be overwritten.
       # addParams:
       # safe_prompt: true # This field is specific to Mistral AI: https://docs.mistral.ai/api/
