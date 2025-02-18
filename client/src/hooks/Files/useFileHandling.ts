@@ -50,22 +50,8 @@ const useFileHandling = (params?: UseFileHandling) => {
 
   const endpoint = useMemo(
     () =>
-      params?.overrideEndpoint ?? conversation?.endpoint,
-    [params?.overrideEndpoint, conversation?.endpoint],
-  );
-  const endpointType = useMemo(
-    () =>
-      params?.overrideEndpoint ?? conversation?.endpointType ?? 'default',
-    [params?.overrideEndpoint, conversation?.endpointType],
-  );
-
-  const { fileLimit, fileSizeLimit, totalSizeLimit, supportedMimeTypes } = useMemo(
-    () =>
-      fileConfig?.endpoints[endpointType] ??
-      fileConfig?.endpoints.default ??
-      defaultFileConfig.endpoints[endpointType] ??
-      defaultFileConfig.endpoints.default,
-    [fileConfig, endpointType],
+      params?.overrideEndpoint ?? conversation?.endpointType ?? conversation?.endpoint ?? 'default',
+    [params?.overrideEndpoint, conversation?.endpointType, conversation?.endpoint],
   );
 
   const displayToast = useCallback(() => {
@@ -161,7 +147,6 @@ const useFileHandling = (params?: UseFileHandling) => {
 
     const formData = new FormData();
     formData.append('endpoint', endpoint);
-    formData.append('endpointType', endpointType);
     formData.append('file', extendedFile.file as File, encodeURIComponent(filename));
     formData.append('file_id', extendedFile.file_id);
 
