@@ -1,0 +1,107 @@
+# For more information, see the Configuration Guide:
+# https://www.librechat.ai/docs/configuration/librechat_yaml
+
+# Configuration version (required)
+version: 1.2.1
+
+# Cache settings: Set to true to enable caching
+
+# cache: true
+fileStrategy: "s3"
+
+# Custom interface configuration
+interface:
+  # Privacy policy settings
+  privacyPolicy:
+    externalUrl: 'https://app.termly.io/policy-viewer/policy.html?policyUUID=0c91586e-1d8d-489e-83af-70b343467a34'
+    openNewTab: true
+
+  # Terms of service
+  termsOfService:
+    externalUrl: 'https://app.termly.io/policy-viewer/policy.html?policyUUID=c5f9adb5-4979-4c41-81de-904f87321a4e'
+    openNewTab: true
+    modalAcceptance: true
+    modalTitle: "Terms of Service for AskCTO"
+    modalContent: |
+
+      ## 1. Introduction
+      
+      Welcome to AskCTO ("the Tool"), a free AI-powered assistant designed to help small businesses and startups navigate AWS cloud technologies. By accessing and using AskCTO, you agree to these Terms and Conditions ("Terms"). If you do not agree, please refrain from using the Tool.
+
+      ## 2. Use of AskCTO
+      
+      AskCTO is provided as a free resource to help SMBs and startups understand AWS best practices, security compliance, migration, and cost optimization.
+      Users may submit inquiries and receive AI-generated responses based on AWS knowledge and best practices.
+      While we strive for accuracy, AskCTO is an informational tool and should not be considered a substitute for professional consulting services.
+      
+      ## 3. Data Collection and Usage
+      
+      By using AskCTO, you acknowledge that we may collect and store non-sensitive information related to your AWS needs and inquiries.
+      This data may be used to improve the tool and to offer personalized follow-up assistance regarding AWS solutions.
+      We may contact you via email or phone to provide additional guidance, offer AWS-related services, or discuss potential collaboration opportunities.
+      
+      ## 4. No Warranty & Limitation of Liability
+      
+      AskCTO is provided "as is" without warranties of any kind, including accuracy, reliability, or fitness for a particular purpose.
+      We are not responsible for any decisions, implementations, or outcomes based on the information provided by AskCTO.
+      Under no circumstances shall we be liable for any direct, indirect, incidental, or consequential damages arising from the use of the Tool.
+      
+      ## 5. Privacy & Data Protection
+      
+      We respect user privacy and handle collected data in accordance with applicable laws.
+      We do not sell or share user data with third parties outside of our AWS consulting and service offerings.
+      Users may request data deletion by contacting us at support@ascendingdc.com
+      
+      ## 6. Changes to These Terms
+      
+      We reserve the right to update these Terms at any time. Continued use of AskCTO after changes take effect constitutes acceptance of the revised Terms.
+      
+      ## 7. Contact Information
+      
+      For questions or concerns regarding these Terms, please contact us at:
+      📧 support@ascendingdc.com
+
+
+  endpointsMenu: false
+  modelSelect: true
+  parameters: true
+  sidePanel: true
+  presets: false
+  prompts: true
+  bookmarks: true
+  multiConvo: true
+  agents: true
+
+
+# Definition of custom endpoints
+# https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/custom_endpoint
+endpoints:
+  custom:
+    - name: "AskCTO"
+      apiKey: "${CTO_API_KEY}"
+      # baseURL: "http://q-business-api-service:8080/v1/chat/completions"
+      # for local testing
+      baseURL: "http://localhost:8080/v1/chat/completions"
+      iconURL: "https://ascendingdc.com/logo192.png"
+      models:
+        default: ["AskCTO"]
+      titleConvo: true
+      titleModel: "current_model"
+      summarize: false
+      forcePrompt: false
+      directEndpoint: true
+      modelDisplayLabel: "CTO"
+      buildInRag: true
+    - name: "AskCTO2"
+      apiKey: "${CTO_API_KEY}"
+      baseURL: "http://localhost:8080/v1/chat/completions"
+      iconURL: "https://ascendingdc.com/logo192.png"
+      models:
+        default: ["AskCTO-dummy"]
+      titleConvo: true
+      titleModel: "current_model"
+      summarize: false
+      forcePrompt: false
+      directEndpoint: true
+      modelDisplayLabel: "AskCTO-dummy"
+      buildInRag: false
