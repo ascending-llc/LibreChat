@@ -61,7 +61,6 @@ async function getS3URL({ fileName, basePath = 'images' }) {
   }
 }
 
-
 /**
  * Uploads a buffer to an S3 bucket.
  * @param {Object} params - The parameters object.
@@ -171,7 +170,6 @@ const deleteS3FileByPath = async (req, file) => {
     throw error;
   }
 };
-
 
 /**
  * Uploads a file to an S3 bucket.

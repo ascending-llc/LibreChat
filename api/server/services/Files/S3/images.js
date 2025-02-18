@@ -27,24 +27,23 @@ const { logger } = require('~/config');
 async function uploadImageToS3({ req, file, file_id, endpoint, resolution = 'high' }) {
   const inputFilePath = file.path;
   const inputBuffer = await fs.promises.readFile(inputFilePath);
-  
   // Resize image buffer
   const { buffer: resizedBuffer, width, height } = await resizeImageBuffer(inputBuffer, resolution, endpoint);
-  
+
   const extension = path.extname(inputFilePath);
   const userId = req.user.id;
-  
+
   let webPBuffer;
   let fileName = `${file_id}__${path.basename(inputFilePath)}`;
   const targetExtension = `.${req.app.locals.imageOutputType}`;
-  
+
   // Convert image if necessary
   if (extension.toLowerCase() === targetExtension) {
-      webPBuffer = resizedBuffer;
+    webPBuffer = resizedBuffer;
   } else {
-      webPBuffer = await sharp(resizedBuffer).toFormat(req.app.locals.imageOutputType).toBuffer();
-      fileName = fileName.replace(new RegExp(path.extname(fileName) + '$'), targetExtension);
-      if (!path.extname(fileName)) fileName += targetExtension;
+    webPBuffer = await sharp(resizedBuffer).toFormat(req.app.locals.imageOutputType).toBuffer();
+    fileName = fileName.replace(new RegExp(path.extname(fileName) + '$'), targetExtension);
+    if (!path.extname(fileName)) fileName += targetExtension;
   }
 
   // Upload to S3
@@ -57,7 +56,6 @@ async function uploadImageToS3({ req, file, file_id, endpoint, resolution = 'hig
   return { filepath: downloadURL, bytes, width, height };
 }
 
-
 /**
  * Updates the file and returns the URL in expected order/format for image payload handling.
  * @param {Object} req - The request object.
@@ -68,7 +66,6 @@ async function prepareImageURLS3(req, file) {
   const { filepath } = file;
   return Promise.all([updateFile({ file_id: file.file_id }), filepath]);
 }
-
 
 /**
  * Uploads a user's avatar to S3 bucket and returns the URL.
@@ -82,22 +79,22 @@ async function prepareImageURLS3(req, file) {
  */
 async function processS3Avatar({ buffer, userId, manual }) {
   try {
-      // Upload avatar to S3
-      const downloadURL = await saveBufferToS3({
-          userId,
-          buffer,
-          fileName: 'avatar.png',
-      });
+    // Upload avatar to S3
+    const downloadURL = await saveBufferToS3({
+      userId,
+      buffer,
+      fileName: 'avatar.png',
+    });
 
-      // Check if this is a manual update
-      if (manual === 'true') {
-          await updateUser(userId, { avatar: downloadURL });
-      }
+    // Check if this is a manual update
+    if (manual === 'true') {
+      await updateUser(userId, { avatar: downloadURL });
+    }
 
-      return downloadURL;
+    return downloadURL;
   } catch (error) {
-      logger.error('Error uploading profile picture:', error);
-      throw error;
+    logger.error('Error uploading profile picture:', error);
+    throw error;
   }
 }
 
