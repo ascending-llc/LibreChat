@@ -378,10 +378,27 @@ const uploadImageBuffer = async ({ req, context, metadata = {}, resize = true })
  * @returns {Promise<void>}
  */
 const processFileUpload = async ({ req, res, metadata }) => {
+  //TODO metadata is suppose include following dataformat
+  /**
+   * {endpoint:"AskCTO",
+   * endpointType:"custom"}
+   * instead of endpoint: custom
+   */
+  // console.log('metadata');
+  // console.log(metadata);
+  // console.log('endpoints');
+  const endpointsConfig = await getEndpointsConfig(req);
+  const endpointCfg = endpointsConfig[metadata.endpoint];
+  // console.log(endpointCfg);
+  const buildInRag = endpointCfg?.buildInRag;
+  // console.log('buildInRag');
+  // console.log(buildInRag);
+
   const isAssistantUpload = isAssistantsEndpoint(metadata.endpoint);
   const assistantSource =
     metadata.endpoint === EModelEndpoint.azureAssistants ? FileSources.azure : FileSources.openai;
-  const source = isAssistantUpload ? assistantSource : FileSources.vectordb;
+  const source = isAssistantUpload ? assistantSource : buildInRag ? req.app.locals.fileStrategy : FileSources.vectordb;
+  logger.debug(`source:${source}`);
   const { handleFileUpload } = getStrategyFunctions(source);
   const { file_id, temp_file_id } = metadata;
 
