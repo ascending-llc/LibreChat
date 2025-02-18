@@ -114,6 +114,7 @@ const initializeClient = async ({ req, res, endpointOption, optionsOnly, overrid
     directEndpoint: endpointConfig.directEndpoint,
     titleMessageRole: endpointConfig.titleMessageRole,
     streamRate: endpointConfig.streamRate,
+    buildInRag: endpointConfig.buildInRag ?? false,
     endpointTokenConfig,
   };
 
