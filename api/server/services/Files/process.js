@@ -385,7 +385,14 @@ const processFileUpload = async ({ req, res, metadata }) => {
   const isAssistantUpload = isAssistantsEndpoint(metadata.endpoint);
   const assistantSource =
     metadata.endpoint === EModelEndpoint.azureAssistants ? FileSources.azure : FileSources.openai;
-  const source = isAssistantUpload ? assistantSource : buildInRag ? req.app.locals.fileStrategy : FileSources.vectordb;
+  let source;
+  if (isAssistantUpload) {
+    source = assistantSource;
+  } else if (buildInRag) {
+    source = req.app.locals.fileStrategy;
+  } else {
+    source = FileSources.vectordb;
+  }
   logger.debug(`source:${source}`);
   const { handleFileUpload } = getStrategyFunctions(source);
   const { file_id, temp_file_id } = metadata;
